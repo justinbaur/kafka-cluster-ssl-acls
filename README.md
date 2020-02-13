@@ -8,6 +8,9 @@ Setup a kafka cluster in docker to test ssl acls pattern
 - Openssl
 - Kafka CLI
 
+### Optional
+- Terraform
+
 ## Cluster Setup
 - Export KAFKA_SSL_SECRETS_DIR to the location of this repositories secrets folder
 - Run secrets/create-certs.sh
@@ -16,31 +19,32 @@ Setup a kafka cluster in docker to test ssl acls pattern
 # Provision
 - Setup a test user topic against zookeeper as it is not setup with SSL ACLs for this cluster
 ```bash
-kafka-topics --zookeeper localhost:22181 --create --topic tf_test_acl --replication-factor 3 --partitions 12
+kafka-topics --zookeeper localhost:22181 --create --topic test_acl --replication-factor 3 --partitions 12
 ```
 - Setup the test admin topic
 ```bash
-kafka-topics --zookeeper localhost:22181 --create --topic tf_test_acl_admin --replication-factor 3 --partitions 12
+kafka-topics --zookeeper localhost:22181 --create --topic test_acl_admin --replication-factor 3 --partitions 12
 ```
 - Setup ACLs on user topic 
 ```bash
-kafka-acls --authorizer-properties zookeeper.connect=localhost:22181 --add --allow-principal User:CN=TF,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX --operation All --topic tf_test_acl --cluster --group mygroup
+kafka-acls --authorizer-properties zookeeper.connect=localhost:22181 --add --allow-principal User:CN=user.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US --operation All --topic test_acl --cluster --group mygroup
 ```
 
-# Test
+# Testing
+## Kafka CLI
 - Start a user consumer to start pulling from the user topic
 ```bash
-kafka-console-consumer --bootstrap-server localhost:19092,localhost:29092,localhost:39092 --topic tf_test_acl --group mygroup --consumer.config secrets/tf-ssl.properties --from-beginning
+kafka-console-consumer --bootstrap-server localhost:19092,localhost:29092,localhost:39092 --topic test_acl --group mygroup --consumer.config secrets/user-ssl.properties --from-beginning
 ```
 
 - Start a user producing to the user topic
 ```bash
-kafka-console-producer --broker-list localhost:19092,localhost:29092,localhost:39092 --topic tf_test_acl --producer.config secrets/tf-ssl.properties
+kafka-console-producer --broker-list localhost:19092,localhost:29092,localhost:39092 --topic test_acl --producer.config secrets/user-ssl.properties
 ```
 
 - Test that the user cannot consume from the admin topic
 ```bash
-kafka-console-consumer --bootstrap-server localhost:19092,localhost:29092,localhost:39092 --topic tf_test_acl_admin --group mygroup --consumer.config secrets/tf-ssl.properties --from-beginning
+kafka-console-consumer --bootstrap-server localhost:19092,localhost:29092,localhost:39092 --topic test_acl_admin --group mygroup --consumer.config secrets/user-ssl.properties --from-beginning
 ```
 
 The logs should be something like the following
@@ -52,50 +56,64 @@ org.apache.kafka.common.errors.TopicAuthorizationException: Not authorized to ac
 Processed a total of 0 messages
 ```
 
+## Terraform
+### Setup
+- [Get Terraform](https://learn.hashicorp.com/terraform/getting-started/install)
+- [Grab the kafka provider](https://github.com/Mongey/terraform-provider-kafka/releases)
+
+### Usage
+- Run terraform against templates in ./terraform
 
 # Reference
 ## Client cert setup
 The following are the portions of the create-certs.sh that enable the client cert authentication when using the kafka CLI
 
+- Generate a key pair for the client
+- Sign it with the CA
+- Import signed cert into broker trust
+
 ```bash
-keytool -noprompt -keystore kafka.client.keystore.jks -alias TF -validity 365 -genkey -dname CN=TF,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX -keypass confluent -storepass confluent
-keytool -noprompt -keystore kafka.admin.keystore.jks -alias TF -validity 365 -genkey -dname CN=TF_ADMIN,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX -keypass confluent -storepass confluent
+	keytool -genkey -noprompt \
+				 -alias $i \
+				 -dname "CN=$i.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US" \
+				 -keystore kafka.$i.keystore.jks \
+				 -keyalg RSA \
+				 -storepass kafkatest \
+				 -keypass kafkatest
 
-keytool -noprompt -keystore kafka.client.truststore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass confluent
-keytool -noprompt -keystore kafka.admin.truststore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass confluent
+	keytool -noprompt -keystore kafka.$i.keystore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass kafkatest
 
-keytool -noprompt -keystore kafka.client.keystore.jks -alias TF -certreq -file cert-file-client-tf -storepass confluent
-keytool -noprompt -keystore kafka.admin.keystore.jks -alias TF -certreq -file cert-file-client-tf-admin -storepass confluent
+	keytool -noprompt -keystore kafka.$i.keystore.jks -alias $i -certreq -file cert-file-client-$i -storepass kafkatest
 
-openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in cert-file-client-tf -out cert-signed-client-tf -days 365 -CAcreateserial -passin pass:confluent
-openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in cert-file-client-tf-admin -out cert-signed-client-tf-admin -days 365 -CAcreateserial -passin pass:confluent
+	openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in cert-file-client-$i -out cert-signed-client-$i -days 365 -CAcreateserial -passin pass:kafkatest
 
-keytool -keystore kafka.broker1.truststore.jks -alias TF -import -file cert-signed-client-tf -storepass confluent
-keytool -keystore kafka.broker1.truststore.jks -alias TF_ADMIN -import -file cert-signed-client-tf-admin -storepass confluent
-keytool -keystore kafka.broker2.truststore.jks -alias TF -import -file cert-signed-client-tf -storepass confluent
-keytool -keystore kafka.broker2.truststore.jks -alias TF_ADMIN -import -file cert-signed-client-tf-admin -storepass confluent
-keytool -keystore kafka.broker3.truststore.jks -alias TF -import -file cert-signed-client-tf -storepass confluent
-keytool -keystore kafka.broker3.truststore.jks -alias TF_ADMIN -import -file cert-signed-client-tf-admin -storepass confluent
+	# Create truststore and import the CA cert.
+	keytool -noprompt -keystore kafka.$i.truststore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass kafkatest -keypass kafkatest
+
+	# Add signed client cert to brokers trust
+	keytool -noprompt -keystore kafka.broker1.truststore.jks -alias $i -import -file cert-signed-client-$i -storepass kafkatest
+	keytool -noprompt -keystore kafka.broker2.truststore.jks -alias $i -import -file cert-signed-client-$i -storepass kafkatest
+	keytool -noprompt -keystore kafka.broker3.truststore.jks -alias $i -import -file cert-signed-client-$i -storepass kafkatest
 ```
 
 The following properties in the docker-compose.yml that enable the acls are
 ```
-KAFKA_SSL_CLIENT_AUTH: required
-KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
-KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.auth.SimpleAclAuthorizer
-KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
-KAFKA_SUPER_USERS: User:CN=TF_ADMIN,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX;User:CN=broker3.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US;User:CN=broker2.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US;User:CN=broker1.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.auth.SimpleAclAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_SUPER_USERS: User:CN=admin.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker3.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker2.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker1.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US
 ```
 
-User Client SSL Properties
+User SSL Properties
 ```
-ssl.truststore.location=secrets/kafka.client.truststore.jks
-ssl.truststore.password=confluent
+ssl.truststore.location=secrets/kafka.user.truststore.jks
+ssl.truststore.password=kafkatest
 
-ssl.keystore.location=secrets/kafka.client.keystore.jks
-ssl.keystore.password=confluent
+ssl.keystore.location=secrets/kafka.user.keystore.jks
+ssl.keystore.password=kafkatest
 
-ssl.key.password=confluent
+ssl.key.password=kafkatest
 ssl.endpoint.identification.algorithm= 
 
 security.protocol=SSL
