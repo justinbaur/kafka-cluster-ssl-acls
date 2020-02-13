@@ -6,60 +6,67 @@ set -o nounset \
     -o xtrace
 
 # Generate CA key
-openssl req -new -x509 -keyout snakeoil-ca-1.key -out snakeoil-ca-1.crt -days 365 -subj '/CN=ca1.test.confluent.io/OU=TEST/O=CONFLUENT/L=PaloAlto/S=Ca/C=US' -passin pass:confluent -passout pass:confluent
+openssl req -new -x509 -keyout snakeoil-ca-1.key -out snakeoil-ca-1.crt -days 365 -subj '/CN=ca1.test/OU=TEST/O=TEST/L=TEST/ST=TEST/C=US' -passin pass:kafkatest -passout pass:kafkatest
 
-# Kafkacat
-openssl genrsa -des3 -passout "pass:confluent" -out kafkacat.client.key 1024
-openssl req -passin "pass:confluent" -passout "pass:confluent" -key kafkacat.client.key -new -out kafkacat.client.req -subj '/CN=kafkacat.test.confluent.io/OU=TEST/O=CONFLUENT/L=PaloAlto/S=Ca/C=US'
-openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in kafkacat.client.req -out kafkacat-ca1-signed.pem -days 9999 -CAcreateserial -passin "pass:confluent"
-
-
-
-for i in broker1 broker2 broker3 producer consumer
+# Setup broker stores
+for i in broker1 broker2 broker3
 do
 	echo $i
 	# Create keystores
 	keytool -genkey -noprompt \
 				 -alias $i \
-				 -dname "CN=$i.test.confluent.io, OU=TEST, O=CONFLUENT, L=PaloAlto, S=Ca, C=US" \
+				 -dname "CN=$i.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US" \
 				 -keystore kafka.$i.keystore.jks \
 				 -keyalg RSA \
-				 -storepass confluent \
-				 -keypass confluent
+				 -storepass kafkatest \
+				 -keypass kafkatest
 
 	# Create CSR, sign the key and import back into keystore
-	keytool -noprompt -keystore kafka.$i.keystore.jks -alias $i -certreq -file $i.csr -storepass confluent -keypass confluent
+	keytool -noprompt -keystore kafka.$i.keystore.jks -alias $i -certreq -file $i.csr -storepass kafkatest -keypass kafkatest
 
-	openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in $i.csr -out $i-ca1-signed.crt -days 9999 -CAcreateserial -passin pass:confluent
+	openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in $i.csr -out $i-ca1-signed.crt -days 9999 -CAcreateserial -passin pass:kafkatest
 
-	keytool -noprompt -keystore kafka.$i.keystore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass confluent -keypass confluent
+	keytool -noprompt -keystore kafka.$i.keystore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass kafkatest -keypass kafkatest
 
-	keytool -noprompt -keystore kafka.$i.keystore.jks -alias $i -import -file $i-ca1-signed.crt -storepass confluent -keypass confluent
+	keytool -noprompt -keystore kafka.$i.keystore.jks -alias $i -import -file $i-ca1-signed.crt -storepass kafkatest -keypass kafkatest
 
 	# Create truststore and import the CA cert.
-	keytool -noprompt -keystore kafka.$i.truststore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass confluent -keypass confluent
+	keytool -noprompt -keystore kafka.$i.truststore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass kafkatest -keypass kafkatest
 
-  echo "confluent" > ${i}_sslkey_creds
-  echo "confluent" > ${i}_keystore_creds
-  echo "confluent" > ${i}_truststore_creds
+  echo "kafkatest" > ${i}_sslkey_creds
+  echo "kafkatest" > ${i}_keystore_creds
+  echo "kafkatest" > ${i}_truststore_creds
 done
 
-keytool -noprompt -keystore kafka.client.keystore.jks -alias TF -validity 365 -genkey -dname CN=TF,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX -keypass confluent -storepass confluent
-keytool -noprompt -keystore kafka.admin.keystore.jks -alias TF -validity 365 -genkey -dname CN=TF_ADMIN,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX -keypass confluent -storepass confluent
+# Setup client stores
+for i in admin user
+do
+	echo $i
+	# Create keystores
+	keytool -genkey -noprompt \
+				 -alias $i \
+				 -dname "CN=$i.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US" \
+				 -keystore kafka.$i.keystore.jks \
+				 -keyalg RSA \
+				 -storepass kafkatest \
+				 -keypass kafkatest
 
-keytool -noprompt -keystore kafka.client.truststore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass confluent
-keytool -noprompt -keystore kafka.admin.truststore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass confluent
+	keytool -noprompt -keystore kafka.$i.keystore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass kafkatest
 
-keytool -noprompt -keystore kafka.client.keystore.jks -alias TF -certreq -file cert-file-client-tf -storepass confluent
-keytool -noprompt -keystore kafka.admin.keystore.jks -alias TF -certreq -file cert-file-client-tf-admin -storepass confluent
+	keytool -noprompt -keystore kafka.$i.keystore.jks -alias $i -certreq -file cert-file-client-$i -storepass kafkatest
 
-openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in cert-file-client-tf -out cert-signed-client-tf -days 365 -CAcreateserial -passin pass:confluent
-openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in cert-file-client-tf-admin -out cert-signed-client-tf-admin -days 365 -CAcreateserial -passin pass:confluent
+	openssl x509 -req -CA snakeoil-ca-1.crt -CAkey snakeoil-ca-1.key -in cert-file-client-$i -out cert-signed-client-$i -days 365 -CAcreateserial -passin pass:kafkatest
 
-keytool -noprompt -keystore kafka.broker1.truststore.jks -alias TF -import -file cert-signed-client-tf -storepass confluent
-keytool -noprompt -keystore kafka.broker1.truststore.jks -alias TF_ADMIN -import -file cert-signed-client-tf-admin -storepass confluent
-keytool -noprompt -keystore kafka.broker2.truststore.jks -alias TF -import -file cert-signed-client-tf -storepass confluent
-keytool -noprompt -keystore kafka.broker2.truststore.jks -alias TF_ADMIN -import -file cert-signed-client-tf-admin -storepass confluent
-keytool -noprompt -keystore kafka.broker3.truststore.jks -alias TF -import -file cert-signed-client-tf -storepass confluent
-keytool -noprompt -keystore kafka.broker3.truststore.jks -alias TF_ADMIN -import -file cert-signed-client-tf-admin -storepass confluent
+	# Create truststore and import the CA cert.
+	keytool -noprompt -keystore kafka.$i.truststore.jks -alias CARoot -import -file snakeoil-ca-1.crt -storepass kafkatest -keypass kafkatest
 
+	# Add signed client cert to brokers trust
+	keytool -noprompt -keystore kafka.broker1.truststore.jks -alias $i -import -file cert-signed-client-$i -storepass kafkatest
+	keytool -noprompt -keystore kafka.broker2.truststore.jks -alias $i -import -file cert-signed-client-$i -storepass kafkatest
+	keytool -noprompt -keystore kafka.broker3.truststore.jks -alias $i -import -file cert-signed-client-$i -storepass kafkatest
+
+	# Export raw key from keystore for other use cases
+	keytool -noprompt -importkeystore -srckeystore kafka.$i.keystore.jks -destkeystore kafka.$i.keystore.p12 -deststoretype PKCS12 -srcstorepass kafkatest -deststorepass kafkatest
+	openssl pkcs12 -in kafka.$i.keystore.p12 -nodes -nocerts -out $i.private.key -passin pass:kafkatest
+	openssl rsa -in $i.private.key -out $i.private.key 
+done

@@ -61,7 +61,7 @@ services:
       KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
       KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.auth.SimpleAclAuthorizer
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
-      KAFKA_SUPER_USERS: User:CN=TF_ADMIN,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX;User:CN=broker3.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US;User:CN=broker2.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US;User:CN=broker1.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US
+      KAFKA_SUPER_USERS: User:CN=admin.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker3.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker2.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker1.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US
     volumes:
       - ${KAFKA_SSL_SECRETS_DIR}:/etc/kafka/secrets
     extra_hosts:
@@ -88,7 +88,7 @@ services:
       KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
       KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.auth.SimpleAclAuthorizer
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
-      KAFKA_SUPER_USERS: User:CN=TF_ADMIN,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX;User:CN=broker3.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US;User:CN=broker2.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US;User:CN=broker1.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US
+      KAFKA_SUPER_USERS: User:CN=admin.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker3.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker2.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker1.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US
     volumes:
       - ${KAFKA_SSL_SECRETS_DIR}:/etc/kafka/secrets
     extra_hosts:
@@ -115,7 +115,7 @@ services:
       KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
       KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.auth.SimpleAclAuthorizer
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
-      KAFKA_SUPER_USERS: User:CN=TF_ADMIN,OU=kafka,O=kafka,L=kafka,ST=kafka,C=XX;User:CN=broker3.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US;User:CN=broker2.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US;User:CN=broker1.test.confluent.io,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US
+      KAFKA_SUPER_USERS: User:CN=admin.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker3.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker2.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US;User:CN=broker1.test,OU=TEST,O=TEST,L=TEST,ST=TEST,C=US
     volumes:
       - ${KAFKA_SSL_SECRETS_DIR}:/etc/kafka/secrets
     extra_hosts:
